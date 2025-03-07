@@ -28,7 +28,7 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
     }
 
     // Already pushed to the byte stream
-    if (data_end == data_unassembled_begin) {
+    if (data_unassembled_begin == data_end) {
         _check_and_end_input();
         return;
     }
@@ -41,26 +41,22 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
         return;
     }
 
-    // Unassembled data chunks, adjacent to each other
-    auto it = _bytes.upper_bound(data_unassembled_begin);
-    decltype(it) next;
-
-    uint64_t begin;
-    if (it == _bytes.begin()) {
+    auto next = _bytes.upper_bound(data_unassembled_begin);
+    decltype(next) it;
+    if (next == _bytes.begin()) {
         _insert_bytes(data_unassembled_begin,
-                      data.substr(data_unassembled_begin - data_begin, it->first - data_unassembled_begin));
+                      data.substr(data_unassembled_begin - data_begin, next->first - data_unassembled_begin));
+        it = next;
         next = std::next(it);
-        begin = it->first + it->second.length();
     } else {
-        next = it;
-        it = std::prev(it);
-        begin = std::max(it->first + it->second.length(), data_unassembled_begin);
+        it = std::prev(next);
     }
+    uint64_t begin = std::max(it->first + it->second.length(), data_unassembled_begin);
 
     while (true) {
         auto end = next->first;
         if (next == _bytes.end() || data_end <= end) {
-            if (data_end > begin)
+            if (begin < data_end)
                 _insert_bytes(begin, data.substr(begin - data_begin));
             break;
         }
