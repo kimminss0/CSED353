@@ -54,7 +54,7 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
     uint64_t begin = std::max(it->first + it->second.length(), data_unassembled_begin);
 
     while (true) {
-        auto end = next->first;
+        const auto end = next->first;
         if (next == _bytes.end() || data_end <= end) {
             if (begin < data_end)
                 _insert_bytes(begin, data.substr(begin - data_begin));
@@ -73,7 +73,7 @@ size_t StreamReassembler::unassembled_bytes() const { return _bytes_unassembled;
 
 bool StreamReassembler::empty() const { return _bytes.empty(); }
 
-void StreamReassembler::_insert_bytes(uint64_t index, std::string &&data) {
+void StreamReassembler::_insert_bytes(const uint64_t index, std::string &&data) {
     if (data.empty())
         return;
     _bytes_unassembled += data.length();
@@ -81,9 +81,9 @@ void StreamReassembler::_insert_bytes(uint64_t index, std::string &&data) {
 }
 
 void StreamReassembler::_assemble_and_push_bytes() {
-    for (auto it = _bytes.find(_bytes_assembled); it->first == _bytes_assembled && it != _bytes.end();) {
+    for (auto it = _bytes.find(_bytes_assembled); it != _bytes.end() && it->first == _bytes_assembled;) {
         const auto str = it->second;
-        auto sz = _output.write(str);
+        const auto sz = _output.write(str);
         _bytes_unassembled -= str.length();
         _bytes_assembled += sz;
         auto t = it;
@@ -93,7 +93,7 @@ void StreamReassembler::_assemble_and_push_bytes() {
 }
 
 bool StreamReassembler::_check_and_end_input() {
-    auto is_end_of_input = _eof && _bytes_assembled == _last_byte;
+    const auto is_end_of_input = _eof && _bytes_assembled == _last_byte;
     if (is_end_of_input)
         _output.end_input();
     return is_end_of_input;
