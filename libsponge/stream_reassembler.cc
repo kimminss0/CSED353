@@ -44,7 +44,8 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
     auto next = _bytes.upper_bound(data_unassembled_begin);
     decltype(next) it;
     if (next == _bytes.begin()) {
-        _insert_bytes(data_unassembled_begin,
+        _insert_bytes(next,
+                      data_unassembled_begin,
                       data.substr(data_unassembled_begin - data_begin, next->first - data_unassembled_begin));
         it = next;
         next = std::next(it);
@@ -53,14 +54,13 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
     }
     uint64_t begin = std::max(it->first + it->second.length(), data_unassembled_begin);
 
-    while (true) {
-        const auto end = next->first;
-        if (next == _bytes.end() || data_end <= end) {
-            if (begin < data_end)
-                _insert_bytes(begin, data.substr(begin - data_begin));
+    while (begin < data_end) {
+        if (next == _bytes.end()) {
+            _insert_bytes(next, begin, data.substr(begin - data_begin));
             break;
         }
-        _insert_bytes(begin, data.substr(begin - data_begin, end - begin));
+        const auto end = next->first;
+        _insert_bytes(next, begin, data.substr(begin - data_begin, end - begin));
         it = next;
         next = std::next(it);
         begin = it->first + it->second.length();
@@ -77,7 +77,14 @@ void StreamReassembler::_insert_bytes(const uint64_t index, std::string &&data) 
     if (data.empty())
         return;
     _bytes_unassembled += data.length();
-    _bytes[index] = std::move(data);
+    _bytes.try_emplace(index, std::move(data));
+}
+
+void StreamReassembler::_insert_bytes(decltype(_bytes)::const_iterator hint, const uint64_t index, std::string &&data) {
+    if (data.empty())
+        return;
+    _bytes_unassembled += data.length();
+    _bytes.try_emplace(hint, index, std::move(data));
 }
 
 void StreamReassembler::_assemble_and_push_bytes() {
@@ -86,7 +93,7 @@ void StreamReassembler::_assemble_and_push_bytes() {
         const auto sz = _output.write(str);
         _bytes_unassembled -= str.length();
         _bytes_assembled += sz;
-        auto t = it;
+        const auto t = it;
         it = std::next(it);
         _bytes.erase(t);
     }
