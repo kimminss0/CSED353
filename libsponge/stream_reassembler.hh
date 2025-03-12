@@ -24,11 +24,10 @@ class StreamReassembler {
     void _assemble_and_push_bytes();
 
     //! Insert data to internal bytes store
-    void _insert_bytes(uint64_t index, std::string &&data);
     void _insert_bytes(decltype(_bytes)::const_iterator hint, uint64_t index, std::string &&data);
 
-    //! Check if the input stream can be closed and return the result
-    bool _check_and_end_input();
+    //! End the input stream if possible
+    void _attempt_end_input();
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
