@@ -21,4 +21,4 @@ optional<WrappingInt32> TCPReceiver::ackno() const {
     return std::nullopt;
 }
 
-size_t TCPReceiver::window_size() const { return _reassembler.stream_out().remaining_capacity(); }
+size_t TCPReceiver::window_size() const { return stream_out().remaining_capacity(); }
