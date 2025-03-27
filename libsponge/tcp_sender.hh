@@ -7,6 +7,7 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
+#include <map>
 #include <queue>
 
 //! \brief The "sender" part of a TCP implementation.
@@ -17,20 +18,69 @@
 //! segments if the retransmission timer expires.
 class TCPSender {
   private:
+    class Timer {
+      private:
+        //! @brief callback to be called when the timer expires
+        const std::function<void()> _callback;
+
+        //! @brief time remaining on the timer
+        unsigned int _time;
+
+      public:
+        Timer(std::function<void()> callback) : _callback{callback}, _time{0} {}
+
+        //! @brief Reset and start timer
+        //! @param timeout Amount of time to count down; if zero, cancel the timer.
+        void reset(const size_t timeout) { _time = timeout; }
+
+        //! @return Whether timer is active or not
+        bool active() { return _time > 0; }
+
+        //! \brief Notifies the timer of the passage of time
+        void tick(const size_t ms_since_last_tick) {
+            if (_time == 0)
+                return;
+            if (_time <= ms_since_last_tick) {
+                _time = 0;
+                _callback();
+                return;
+            }
+            _time -= ms_since_last_tick;
+        }
+    };
+
     //! our initial sequence number, the number for our SYN.
-    WrappingInt32 _isn;
+    const WrappingInt32 _isn;
+
+    //! @brief current size of receiver window
+    uint16_t _recv_window{1};
+
+    //! @brief current absolute acknowledge number of receiver
+    uint64_t _recv_ackno{0};
 
     //! outbound queue of segments that the TCPSender wants sent
     std::queue<TCPSegment> _segments_out{};
 
-    //! retransmission timer for the connection
-    unsigned int _initial_retransmission_timeout;
+    //! @brief the number of consecutive retransmissions
+    unsigned int _consecutive_retransmissions{0};
+
+    //! retransmission timeout for the connection
+    const unsigned int _initial_retransmission_timeout;
+
+    //! retransmission timer
+    Timer _retransmission_timer{[&]() { this->_retransmission_timeout_reached(); }};
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
+    //! outstanding segments waiting for acknowledgement; use seqno as a key
+    std::map<uint64_t, TCPSegment> _outstanding_segments{};
+
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    //! @brief Retransmission timeout was reached
+    void _retransmission_timeout_reached();
 
   public:
     //! Initialize a TCPSender
