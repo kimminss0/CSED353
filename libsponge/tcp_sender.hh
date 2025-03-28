@@ -19,20 +19,20 @@ class TCPSender {
   private:
     class Timer {
       private:
-        //! @brief callback to be called when the timer expires
+        //! \brief callback to be called when the timer expires
         const std::function<void()> _callback;
 
-        //! @brief time remaining on the timer
+        //! \brief time remaining on the timer
         size_t _time{0};
 
       public:
         Timer(std::function<void()> callback) : _callback{callback} {}
 
-        //! @brief Reset and start timer
-        //! @param timeout Amount of time to count down; if zero, cancel the timer.
+        //! \brief Reset and start timer
+        //! \param timeout Amount of time to count down; if zero, cancel the timer.
         void reset(const size_t timeout) { _time = timeout; }
 
-        //! @return Whether timer is active or not
+        //! \return Whether timer is active or not
         bool active() const { return _time > 0; }
 
         //! \brief Notifies the timer of the passage of time
@@ -51,16 +51,16 @@ class TCPSender {
     //! our initial sequence number, the number for our SYN.
     const WrappingInt32 _isn;
 
-    //! @brief current size of receiver window
+    //! \brief current size of receiver window
     uint16_t _recv_window{1};
 
-    //! @brief current absolute acknowledge number of receiver
+    //! \brief current absolute acknowledge number of receiver
     uint64_t _recv_ackno{0};
 
     //! outbound queue of segments that the TCPSender wants sent
     std::queue<TCPSegment> _segments_out{};
 
-    //! @brief the number of consecutive retransmissions
+    //! \brief the number of consecutive retransmissions
     unsigned int _consecutive_retransmissions{0};
 
     //! retransmission timeout for the connection
@@ -78,7 +78,7 @@ class TCPSender {
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
 
-    //! @brief Retransmission timeout was reached
+    //! \brief Retransmission timeout was reached
     void _retransmission_timeout_reached();
 
   public:
