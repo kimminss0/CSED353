@@ -31,7 +31,7 @@ number is behind the current acknowledge number of the receiver. If any of the
 outstanding segments is acknowledged, it reset the retransmission timer to
 the initial value or stop it if all of them were ACKed.
 
-TCP sender possesses an timer to check RTO(retransmission timeout). The design
+TCP sender possesses a timer to check RTO(retransmission timeout). The design
 of the RTO timer is provided by the `TCPSender::Timer` class definition.
 
 `_retransmission_timeout_reached()` is called when RTO expires and retransmits
