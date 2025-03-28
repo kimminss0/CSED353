@@ -37,18 +37,15 @@ void TCPSender::fill_window() {
         if (abs_seqno >= _recv_ackno + recv_window1 || (syn_sent && _stream.buffer_empty() && !_stream.eof()))
             break;
 
+        const auto data_len = std::min({TCPConfig::MAX_PAYLOAD_SIZE,
+                                        size_t{_recv_ackno + recv_window1 - abs_seqno},
+                                        syn_sent ? _stream.buffer_size() : 0});
         TCPSegment seg;
         seg.header().seqno = seqno;
+        seg.header().syn = !syn_sent;
+        seg.payload() = _stream.read(data_len);
+        seg.header().fin = _stream.eof() && abs_seqno + data_len < _recv_ackno + recv_window1;
 
-        if (!syn_sent) {
-            seg.header().syn = true;
-        } else {
-            const auto data_len = std::min(
-                {TCPConfig::MAX_PAYLOAD_SIZE, size_t{_recv_ackno + recv_window1 - abs_seqno}, _stream.buffer_size()});
-            seg.payload() = _stream.read(data_len);
-            if (_stream.eof() && abs_seqno + data_len < _recv_ackno + recv_window1)
-                seg.header().fin = true;
-        }
         _next_seqno += seg.length_in_sequence_space();
         _segments_out.push(seg);
         _outstanding_segments.push(seg);
