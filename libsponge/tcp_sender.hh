@@ -23,17 +23,17 @@ class TCPSender {
         const std::function<void()> _callback;
 
         //! @brief time remaining on the timer
-        unsigned int _time;
+        size_t _time{0};
 
       public:
-        Timer(std::function<void()> callback) : _callback{callback}, _time{0} {}
+        Timer(std::function<void()> callback) : _callback{callback} {}
 
         //! @brief Reset and start timer
         //! @param timeout Amount of time to count down; if zero, cancel the timer.
         void reset(const size_t timeout) { _time = timeout; }
 
         //! @return Whether timer is active or not
-        bool active() { return _time > 0; }
+        bool active() const { return _time > 0; }
 
         //! \brief Notifies the timer of the passage of time
         void tick(const size_t ms_since_last_tick) {
