@@ -7,7 +7,6 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
-#include <map>
 #include <queue>
 
 //! \brief The "sender" part of a TCP implementation.
@@ -73,8 +72,8 @@ class TCPSender {
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
-    //! outstanding segments waiting for acknowledgement; use seqno as a key
-    std::map<uint64_t, TCPSegment> _outstanding_segments{};
+    //! outstanding segments waiting for acknowledgement
+    std::queue<TCPSegment> _outstanding_segments{};
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};

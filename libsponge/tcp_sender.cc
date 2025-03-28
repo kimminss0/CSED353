@@ -15,7 +15,7 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
     , _stream(capacity) {}
 
 void TCPSender::_retransmission_timeout_reached() {
-    _segments_out.push(_outstanding_segments.begin()->second);
+    _segments_out.push(_outstanding_segments.front());
     if (_recv_window)
         _consecutive_retransmissions++;
     _retransmission_timer.reset(_initial_retransmission_timeout << _consecutive_retransmissions);
@@ -51,7 +51,7 @@ void TCPSender::fill_window() {
         }
         _next_seqno += seg.length_in_sequence_space();
         _segments_out.push(seg);
-        _outstanding_segments.emplace(abs_seqno, seg);
+        _outstanding_segments.push(seg);
 
         if (!_retransmission_timer.active())
             _retransmission_timer.reset(_initial_retransmission_timeout);
@@ -78,11 +78,11 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
         return;
 
     _recv_ackno = abs_ackno;
-    for (auto it = _outstanding_segments.begin();
-         it != _outstanding_segments.end() && it->first + it->second.length_in_sequence_space() <= _recv_ackno;) {
-        const auto next = std::next(it);
-        _outstanding_segments.erase(it);
-        it = next;
+    while (!_outstanding_segments.empty()) {
+        auto seg = _outstanding_segments.front();
+        if (unwrap(seg.header().seqno, _isn, _next_seqno) + seg.length_in_sequence_space() > _recv_ackno)
+            break;
+        _outstanding_segments.pop();
     }
     _consecutive_retransmissions = 0;
     _retransmission_timer.reset(_outstanding_segments.empty() ? 0 : _initial_retransmission_timeout);
