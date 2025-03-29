@@ -82,6 +82,6 @@ unsigned int TCPSender::consecutive_retransmissions() const { return _consecutiv
 
 void TCPSender::send_empty_segment() {
     TCPSegment seg;
-    seg.header().seqno = wrap(_recv_ackno, _isn);
+    seg.header().seqno = next_seqno();
     _segments_out.push(std::move(seg));
 }
