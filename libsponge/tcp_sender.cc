@@ -61,8 +61,8 @@ void TCPSender::fill_window() {
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
     // ignore impossible ackno
-    const auto abs_ackno = unwrap(ackno, _isn, next_seqno_absolute());
-    if (abs_ackno > next_seqno_absolute())
+    const auto abs_ackno = unwrap(ackno, _isn, _recv_ackno);
+    if (abs_ackno > _next_seqno)
         return;
 
     // ignore old ack; already applied
@@ -77,7 +77,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     _recv_ackno = abs_ackno;
     while (!_outstanding_segments.empty()) {
         auto seg = _outstanding_segments.front();
-        if (unwrap(seg.header().seqno, _isn, _next_seqno) + seg.length_in_sequence_space() > _recv_ackno)
+        if (unwrap(seg.header().seqno, _isn, _recv_ackno) + seg.length_in_sequence_space() > _recv_ackno)
             break;
         _outstanding_segments.pop();
     }
