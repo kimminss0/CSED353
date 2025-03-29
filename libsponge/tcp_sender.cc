@@ -24,49 +24,39 @@ void TCPSender::_retransmission_timeout_reached() {
 uint64_t TCPSender::bytes_in_flight() const { return _next_seqno - _recv_ackno; }
 
 void TCPSender::fill_window() {
-    const auto syn_sent = _next_seqno > 0;
-    const auto fin_sent = _stream.eof() && _next_seqno == _stream.bytes_written() + 2;
-    if (fin_sent)
-        return;
-
     const auto recv_window1 = std::max(uint16_t{1}, _recv_window);
     while (true) {
-        const auto abs_seqno = _next_seqno;
-        const auto seqno = next_seqno();
+        const auto syn_sent = _next_seqno > 0;
+        const auto fin_sent = _stream.eof() && _next_seqno == _stream.bytes_written() + 2;
+        const auto unused_window = size_t{recv_window1 - bytes_in_flight()};
 
-        if (abs_seqno >= _recv_ackno + recv_window1 || (syn_sent && _stream.buffer_empty() && !_stream.eof()))
-            break;
+        if (!unused_window || (syn_sent && _stream.buffer_empty() && !_stream.input_ended()) || fin_sent)
+            return;
 
-        const auto data_len = std::min({TCPConfig::MAX_PAYLOAD_SIZE,
-                                        size_t{_recv_ackno + recv_window1 - abs_seqno},
-                                        syn_sent ? _stream.buffer_size() : 0});
         TCPSegment seg;
-        seg.header().seqno = seqno;
-        seg.header().syn = !syn_sent;
-        seg.payload() = _stream.read(data_len);
-        seg.header().fin = _stream.eof() && abs_seqno + data_len < _recv_ackno + recv_window1;
-
+        seg.header().seqno = next_seqno();
+        if (!syn_sent) {
+            seg.header().syn = true;
+        } else {
+            const auto data_len = std::min({TCPConfig::MAX_PAYLOAD_SIZE, unused_window, _stream.buffer_size()});
+            seg.payload() = _stream.read(data_len);
+            seg.header().fin = _stream.eof() && data_len < unused_window;
+        }
         _next_seqno += seg.length_in_sequence_space();
-        _segments_out.push(seg);
         _outstanding_segments.push(seg);
+        _segments_out.push(std::move(seg));
 
         if (!_retransmission_timer.active())
             _retransmission_timer.reset(_initial_retransmission_timeout);
-        if (_stream.eof())
-            break;
     }
 }
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    // ignore impossible ackno
+    // ignore impossible/old ack
     const auto abs_ackno = unwrap(ackno, _isn, _recv_ackno);
-    if (abs_ackno > _next_seqno)
-        return;
-
-    // ignore old ack; already applied
-    if (abs_ackno < _recv_ackno)
+    if (abs_ackno > _next_seqno || abs_ackno < _recv_ackno)
         return;
 
     // only window size is updated; no need to check outstanding segments
@@ -76,7 +66,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 
     _recv_ackno = abs_ackno;
     while (!_outstanding_segments.empty()) {
-        auto seg = _outstanding_segments.front();
+        const auto seg = _outstanding_segments.front();
         if (unwrap(seg.header().seqno, _isn, _recv_ackno) + seg.length_in_sequence_space() > _recv_ackno)
             break;
         _outstanding_segments.pop();
