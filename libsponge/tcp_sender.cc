@@ -24,14 +24,14 @@ void TCPSender::_retransmission_timeout_reached() {
 uint64_t TCPSender::bytes_in_flight() const { return _next_seqno - _recv_ackno; }
 
 void TCPSender::fill_window() {
-    bool syn_sent = next_seqno_absolute();
-    bool fin_sent = _stream.eof() && next_seqno_absolute() == _stream.bytes_written() + 2;
+    const auto syn_sent = _next_seqno > 0;
+    const auto fin_sent = _stream.eof() && _next_seqno == _stream.bytes_written() + 2;
     if (fin_sent)
         return;
 
     const auto recv_window1 = std::max(uint16_t{1}, _recv_window);
     while (true) {
-        const auto abs_seqno = next_seqno_absolute();
+        const auto abs_seqno = _next_seqno;
         const auto seqno = next_seqno();
 
         if (abs_seqno >= _recv_ackno + recv_window1 || (syn_sent && _stream.buffer_empty() && !_stream.eof()))
