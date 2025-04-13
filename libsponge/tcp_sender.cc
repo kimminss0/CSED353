@@ -15,7 +15,10 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
     , _stream(capacity) {}
 
 void TCPSender::_retransmission_timeout_reached() {
+    if (_outstanding_segments.empty())
+        throw std::logic_error("Expected at least one outstanding segment in queue");
     _segments_out.push(_outstanding_segments.front());
+
     if (_recv_window)
         _consecutive_retransmissions++;
     _retransmission_timer.reset(_initial_retransmission_timeout << _consecutive_retransmissions);
