@@ -21,6 +21,12 @@ class TCPConnection {
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
 
+    //! number of milliseconds since the last segment was received
+    size_t _time_since_last_segment_received{0};
+
+    //! \brief Send all segments that the TCPSender has enqueued for transmission
+    void _send_segments();
+
   public:
     //! \name "Input" interface for the writer
     //!@{
