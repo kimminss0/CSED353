@@ -27,6 +27,12 @@ class TCPConnection {
     //! \brief Send all segments that the TCPSender has enqueued for transmission
     void _send_segments();
 
+    //! \brief Send RST packet and reset connection
+    void _send_rst();
+
+    //! \brief Reset TCP connection
+    void _reset_connection();
+
   public:
     //! \name "Input" interface for the writer
     //!@{

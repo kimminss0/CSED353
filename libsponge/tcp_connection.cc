@@ -4,6 +4,20 @@
 
 using namespace std;
 
+void TCPConnection::_send_rst() {
+    _sender.segments_out() = {};
+    _segments_out = {};
+    _sender.send_empty_segment();
+    _sender.segments_out().front().header().rst = true;
+    _send_segments();
+    _reset_connection();
+}
+
+void TCPConnection::_reset_connection() {
+    _sender.stream_in().set_error();
+    _receiver.stream_out().set_error();
+}
+
 void TCPConnection::_send_segments() {
     auto &sender_segments = _sender.segments_out();
     while (!sender_segments.empty()) {
@@ -28,7 +42,10 @@ size_t TCPConnection::time_since_last_segment_received() const { return _time_si
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
     _time_since_last_segment_received = 0;
-    _receiver.segment_received(seg);
+    if (seg.header().rst)
+        _reset_connection();
+    else
+        _receiver.segment_received(seg);
     if (_receiver.stream_out().eof() && !_sender.stream_in().eof())
         _linger_after_streams_finish = false;
     if (seg.header().ack)
@@ -44,6 +61,8 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 }
 
 bool TCPConnection::active() const {
+    if (_receiver.stream_out().error() || _sender.stream_in().error())
+        return false;
     if (!(_receiver.stream_out().eof() && _sender.stream_in().eof() && !_sender.bytes_in_flight()))
         return true;
     if (!_linger_after_streams_finish)
@@ -62,6 +81,8 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     _time_since_last_segment_received += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
+    if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS)
+        _send_rst();
     _send_segments();
 }
 
@@ -80,8 +101,7 @@ TCPConnection::~TCPConnection() {
     try {
         if (active()) {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
-
-            // Your code here: need to send a RST segment to the peer
+            _send_rst();
         }
     } catch (const exception &e) {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
