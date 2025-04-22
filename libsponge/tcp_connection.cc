@@ -10,7 +10,6 @@ void TCPConnection::_send_rst() {
     _sender.send_empty_segment();
     _sender.segments_out().front().header().rst = true;
     _send_segments();
-    _reset_connection();
 }
 
 void TCPConnection::_reset_connection() {
@@ -86,8 +85,10 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     _time_since_last_segment_received += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
-    if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS)
+    if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
         _send_rst();
+        _reset_connection();
+    }
     _send_segments();
 }
 
