@@ -99,6 +99,8 @@ void TCPConnection::end_input_stream() {
 }
 
 void TCPConnection::connect() {
+    if (_sender.next_seqno_absolute() != 0)
+        throw std::logic_error("Connection has already been established");
     _sender.fill_window();
     _send_segments();
 }
