@@ -18,10 +18,11 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
     const uint64_t data_begin = index;
     const uint64_t data_end = data_begin + data.length();
     const uint64_t data_unassembled_begin = std::max(data_begin, _bytes_assembled);
+    const uint64_t data_end_clipped = std::min(data_end, _bytes_assembled + _output.remaining_capacity());
 
-    if (eof) {
+    if (eof && data_end == data_end_clipped) {
         _eof = true;
-        _last_byte = data_end;
+        _last_byte = data_end_clipped;
     }
 
     auto next = _bytes.upper_bound(data_unassembled_begin);
@@ -35,7 +36,7 @@ void StreamReassembler::push_substring(const string &data, const uint64_t index,
         it = std::prev(next);
         begin = std::max(it->first + it->second.length(), data_unassembled_begin);
     }
-    while (begin < data_end) {
+    while (begin < data_end_clipped) {
         if (next == _bytes.end()) {
             _insert_bytes(next, begin, data.substr(begin - data_begin));
             break;
