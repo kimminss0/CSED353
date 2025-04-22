@@ -56,6 +56,9 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         seg.header().seqno == _receiver.ackno().value() - 1)
         _sender.send_empty_segment();
 
+    if (seg.length_in_sequence_space() > 0 && _sender.stream_in().buffer_empty())
+        _sender.send_empty_segment();
+
     _sender.fill_window();
     _send_segments();
 }
