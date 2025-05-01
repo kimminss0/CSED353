@@ -32,6 +32,7 @@
 class NetworkInterface {
   private:
     static const size_t ARP_DEBOUNCE_TIME{5};
+    static const size_t IP_LOOKUP_EXPIRATION_TIME{30};
 
     //! Ethernet (known as hardware, network-access-layer, or link-layer) address of the interface
     EthernetAddress _ethernet_address;
@@ -48,8 +49,14 @@ class NetworkInterface {
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
 
+    //! Learn mapping from IP address to Ethernet address
+    void _learn_ethernet_address(uint32_t ip_address, EthernetAddress ethernet_address);
+
     //! Send ARP requset to the target
     void _send_arp_request(uint32_t target_ip_address);
+
+    //! Send ARP reply to the target
+    void _send_arp_reply(uint32_t target_ip_address, EthernetAddress target_ethernet_address);
 
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses

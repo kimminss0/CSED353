@@ -18,6 +18,17 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 
 using namespace std;
 
+void NetworkInterface::_learn_ethernet_address(uint32_t ip_address, EthernetAddress ethernet_address) {
+    // Attempt to insert the sender's IP and expiration time into the lookup table
+    auto [it, inserted] =
+        _ethernet_address_lookup.emplace(ip_address, std::make_pair(ethernet_address, IP_LOOKUP_EXPIRATION_TIME));
+
+    // If the entry already exists, update the expiration time
+    if (!inserted) {
+        it->second.second = IP_LOOKUP_EXPIRATION_TIME;
+    }
+}
+
 void NetworkInterface::_send_arp_request(uint32_t target_ip_address) {
     auto arp = ARPMessage{};
     arp.opcode = ARPMessage::OPCODE_REQUEST;
@@ -27,6 +38,22 @@ void NetworkInterface::_send_arp_request(uint32_t target_ip_address) {
 
     auto frame = EthernetFrame();
     frame.header().dst = ETHERNET_BROADCAST;
+    frame.header().src = _ethernet_address;
+    frame.header().type = EthernetHeader::TYPE_ARP;
+    frame.payload() = arp.serialize();
+    _frames_out.push(std::move(frame));
+}
+
+void NetworkInterface::_send_arp_reply(uint32_t target_ip_address, EthernetAddress target_ethernet_address) {
+    auto arp = ARPMessage{};
+    arp.opcode = ARPMessage::OPCODE_REPLY;
+    arp.sender_ethernet_address = _ethernet_address;
+    arp.sender_ip_address = _ip_address.ipv4_numeric();
+    arp.target_ip_address = target_ip_address;
+    arp.target_ethernet_address = target_ethernet_address;
+
+    auto frame = EthernetFrame();
+    frame.header().dst = target_ethernet_address;
     frame.header().src = _ethernet_address;
     frame.header().type = EthernetHeader::TYPE_ARP;
     frame.payload() = arp.serialize();
@@ -71,8 +98,40 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
 
 //! \param[in] frame the incoming Ethernet frame
 optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &frame) {
-    DUMMY_CODE(frame);
-    return {};
+    switch (frame.header().type) {
+        case EthernetHeader::TYPE_IPv4: {
+            InternetDatagram dgram;
+            if (dgram.parse(frame.payload()) == ParseResult::NoError)
+                return dgram;
+            return std::nullopt;
+        }
+        case EthernetHeader::TYPE_ARP: {
+            ARPMessage arp;
+            if (arp.parse(frame.payload()) != ParseResult::NoError)
+                return std::nullopt;
+
+            switch (arp.opcode) {
+                case (ARPMessage::OPCODE_REQUEST): {
+                    _learn_ethernet_address(arp.sender_ip_address, arp.sender_ethernet_address);
+                    // If it is asking for our IP address, send ARP reply
+                    if (arp.target_ip_address == _ip_address.ipv4_numeric())
+                        _send_arp_reply(arp.sender_ip_address, arp.sender_ethernet_address);
+                    return std::nullopt;
+                }
+                case (ARPMessage::OPCODE_REPLY): {
+                    _learn_ethernet_address(arp.sender_ip_address, arp.sender_ethernet_address);
+                    _learn_ethernet_address(arp.target_ip_address, arp.target_ethernet_address);
+                    return std::nullopt;
+                }
+                default: {
+                    throw std::runtime_error("Unsupported ARP opcode");
+                }
+            }
+        }
+        default: {
+            throw std::runtime_error("Unsupported Ethernet frame type");
+        }
+    }
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
