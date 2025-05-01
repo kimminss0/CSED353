@@ -52,6 +52,8 @@ class NetworkInterface {
     //! Learn mapping from IP address to Ethernet address
     void _learn_ethernet_address(uint32_t ip_address, EthernetAddress ethernet_address);
 
+    void _send_ipv4_frame(EthernetAddress dst, BufferList&& payload);
+
     //! Send ARP requset to the target
     void _send_arp_request(uint32_t target_ip_address);
 

@@ -27,6 +27,25 @@ void NetworkInterface::_learn_ethernet_address(uint32_t ip_address, EthernetAddr
     if (!inserted) {
         it->second.second = IP_LOOKUP_EXPIRATION_TIME;
     }
+
+    auto it1 = _address_resolution_queue.find(ip_address);
+    if (it1 != _address_resolution_queue.end()) {
+        auto &[debounce, pending_datagrams] = it1->second;
+        while (!pending_datagrams.empty()) {
+            _send_ipv4_frame(ethernet_address, pending_datagrams.front().serialize());
+            pending_datagrams.pop();
+        }
+        _address_resolution_queue.erase(it1);
+    }
+}
+
+void NetworkInterface::_send_ipv4_frame(EthernetAddress dst, BufferList&& payload) {
+    auto frame = EthernetFrame();
+    frame.header().dst = dst;
+    frame.header().src = _ethernet_address;
+    frame.header().type = EthernetHeader::TYPE_IPv4;
+    frame.payload() = std::move(payload);
+    _frames_out.push(std::move(frame));
 }
 
 void NetworkInterface::_send_arp_request(uint32_t target_ip_address) {
@@ -88,12 +107,7 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     }
     // Construct an Ethernet frame with the IP datagram and send it to the resolved Ethernet address
     const auto &[eth_addr, expiration_time] = it->second;
-    auto frame = EthernetFrame();
-    frame.header().dst = eth_addr;
-    frame.header().src = _ethernet_address;
-    frame.header().type = EthernetHeader::TYPE_IPv4;
-    frame.payload() = dgram.serialize();
-    _frames_out.push(std::move(frame));
+    _send_ipv4_frame(eth_addr, dgram.serialize());
 }
 
 //! \param[in] frame the incoming Ethernet frame
@@ -101,9 +115,12 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
     switch (frame.header().type) {
         case EthernetHeader::TYPE_IPv4: {
             InternetDatagram dgram;
-            if (dgram.parse(frame.payload()) == ParseResult::NoError)
-                return dgram;
-            return std::nullopt;
+            if (dgram.parse(frame.payload()) != ParseResult::NoError)
+                return std::nullopt;
+            if (frame.header().dst != _ethernet_address)
+                return std::nullopt;
+            _learn_ethernet_address(dgram.header().src, frame.header().src);
+            return dgram;
         }
         case EthernetHeader::TYPE_ARP: {
             ARPMessage arp;
