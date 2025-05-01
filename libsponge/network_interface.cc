@@ -5,17 +5,6 @@
 
 #include <iostream>
 
-// Dummy implementation of a network interface
-// Translates from {IP datagram, next hop address} to link-layer frame, and from link-layer frame to IP datagram
-
-// For Lab 5, please replace with a real implementation that passes the
-// automated checks run by `make check_lab5`.
-
-// You will need to add private members to the class declaration in `network_interface.hh`
-
-template <typename... Targs>
-void DUMMY_CODE(Targs &&... /* unused */) {}
-
 using namespace std;
 
 void NetworkInterface::_learn_ethernet_address(uint32_t ip_address, EthernetAddress ethernet_address) {
@@ -39,7 +28,7 @@ void NetworkInterface::_learn_ethernet_address(uint32_t ip_address, EthernetAddr
     }
 }
 
-void NetworkInterface::_send_ipv4_frame(EthernetAddress dst, BufferList&& payload) {
+void NetworkInterface::_send_ipv4_frame(EthernetAddress dst, BufferList &&payload) {
     auto frame = EthernetFrame();
     frame.header().dst = dst;
     frame.header().src = _ethernet_address;
