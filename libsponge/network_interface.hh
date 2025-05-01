@@ -37,6 +37,12 @@ class NetworkInterface {
     //! IP (known as internet-layer or network-layer) address of the interface
     Address _ip_address;
 
+    //! Lookup table for mapping known IP addresses to their corresponding Ethernet addresses
+    std::unordered_map<uint32_t, std::pair<EthernetAddress, size_t>> _ethernet_address_lookup;
+
+    //! Queue of Internet datagrams awaiting resolution of their destination Ethernet addresses
+    std::unordered_map<uint32_t, std::pair<size_t, std::queue<InternetDatagram>>> _address_resolution_queue;
+
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
 

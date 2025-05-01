@@ -43,4 +43,13 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
-void NetworkInterface::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
+void NetworkInterface::tick(const size_t ms_since_last_tick) {
+    for (auto &[ip, val] : _address_resolution_queue) {
+        auto &[debounce, queue] = val;
+        debounce -= min(ms_since_last_tick, debounce);
+    }
+    for (auto &[ip, val] : _ethernet_address_lookup) {
+        auto &[eth_addr, expiration_time] = val;
+        expiration_time -= min(ms_since_last_tick, expiration_time);
+    } 
+}
