@@ -8,7 +8,6 @@
 using namespace std;
 
 void NetworkInterface::_learn_ethernet_address(uint32_t ip_address, EthernetAddress ethernet_address) {
-    // Attempt to insert the sender's IP and expiration time into the lookup table
     auto [it, inserted] =
         _ethernet_address_lookup.emplace(ip_address, std::make_pair(ethernet_address, IP_LOOKUP_EXPIRATION_TIME));
 
@@ -99,7 +98,6 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
             _send_arp_request(next_hop_ip);
         return;
     }
-    // Construct an Ethernet frame with the IP datagram and send it to the resolved Ethernet address
     _send_ipv4_frame(eth_addr, dgram.serialize());
 }
 
@@ -108,9 +106,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
     switch (frame.header().type) {
         case EthernetHeader::TYPE_IPv4: {
             InternetDatagram dgram;
-            if (dgram.parse(frame.payload()) != ParseResult::NoError)
-                return std::nullopt;
-            if (frame.header().dst != _ethernet_address)
+            if (dgram.parse(frame.payload()) != ParseResult::NoError || frame.header().dst != _ethernet_address)
                 return std::nullopt;
             _learn_ethernet_address(dgram.header().src, frame.header().src);
             return dgram;
