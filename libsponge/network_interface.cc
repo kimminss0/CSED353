@@ -150,7 +150,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
             }
         }
         default: {
-            throw std::runtime_error("Unsupported Ethernet frame type");
+            return std::nullopt;
         }
     }
 }
