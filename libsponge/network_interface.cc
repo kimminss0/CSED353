@@ -19,10 +19,8 @@ void NetworkInterface::_learn_ethernet_address(uint32_t ip_address, EthernetAddr
     auto it1 = _address_resolution_queue.find(ip_address);
     if (it1 != _address_resolution_queue.end()) {
         auto &[debounce, pending_datagrams] = it1->second;
-        while (!pending_datagrams.empty()) {
-            _send_ipv4_frame(ethernet_address, pending_datagrams.front().serialize());
-            pending_datagrams.pop();
-        }
+        for (auto &&dgram : pending_datagrams)
+            _send_ipv4_frame(ethernet_address, dgram.serialize());
         _address_resolution_queue.erase(it1);
     }
 }
@@ -91,9 +89,9 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     if (it == _ethernet_address_lookup.end()) {
         // Queue the datagram for later transmission and send an ARP request if the debounce timer allows
         auto [it1, inserted] = _address_resolution_queue.emplace(
-            next_hop_ip, std::make_pair(ARP_DEBOUNCE_TIME, std::queue<InternetDatagram>()));
+            next_hop_ip, std::make_pair(ARP_DEBOUNCE_TIME, std::vector<InternetDatagram>()));
         auto &[debounce, pending_datagrams] = it1->second;
-        pending_datagrams.push(dgram);
+        pending_datagrams.emplace_back(std::move(dgram));
         if (inserted || debounce == 0)
             _send_arp_request(next_hop_ip);
         return;

@@ -44,7 +44,7 @@ class NetworkInterface {
     std::unordered_map<uint32_t, std::pair<EthernetAddress, size_t>> _ethernet_address_lookup{};
 
     //! Queue of Internet datagrams awaiting resolution of their destination Ethernet addresses
-    std::unordered_map<uint32_t, std::pair<size_t, std::queue<InternetDatagram>>> _address_resolution_queue{};
+    std::unordered_map<uint32_t, std::pair<size_t, std::vector<InternetDatagram>>> _address_resolution_queue{};
 
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
