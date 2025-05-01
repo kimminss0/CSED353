@@ -95,6 +95,11 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
 
     auto it = _ethernet_address_lookup.find(next_hop_ip);
+    const auto &[eth_addr, expiration_time] = it->second;
+    if (it != _ethernet_address_lookup.end() && expiration_time == 0) {
+        _ethernet_address_lookup.erase(it);
+        it = _ethernet_address_lookup.end();
+    }
     if (it == _ethernet_address_lookup.end()) {
         // Queue the datagram for later transmission and send an ARP request if the debounce timer allows
         auto [it1, inserted] = _address_resolution_queue.emplace(
@@ -106,7 +111,6 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
         return;
     }
     // Construct an Ethernet frame with the IP datagram and send it to the resolved Ethernet address
-    const auto &[eth_addr, expiration_time] = it->second;
     _send_ipv4_frame(eth_addr, dgram.serialize());
 }
 

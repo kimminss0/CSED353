@@ -31,8 +31,8 @@
 //! and learns or replies as necessary.
 class NetworkInterface {
   private:
-    static const size_t ARP_DEBOUNCE_TIME{5};
-    static const size_t IP_LOOKUP_EXPIRATION_TIME{30};
+    static const size_t ARP_DEBOUNCE_TIME{5000};
+    static const size_t IP_LOOKUP_EXPIRATION_TIME{30000};
 
     //! Ethernet (known as hardware, network-access-layer, or link-layer) address of the interface
     EthernetAddress _ethernet_address;
