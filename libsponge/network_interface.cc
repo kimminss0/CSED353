@@ -33,7 +33,37 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
 
-    DUMMY_CODE(dgram, next_hop, next_hop_ip);
+    auto it = _ethernet_address_lookup.find(next_hop_ip);
+    if (it == _ethernet_address_lookup.end()) {
+        // Queue the datagram for later transmission and send an ARP request if the debounce timer allows
+        auto [it1, inserted] = _address_resolution_queue.emplace(
+            next_hop_ip, std::make_pair(ARP_DEBOUNCE_TIME, std::queue<InternetDatagram>()));
+        auto &[debounce, pending_datagrams] = it1->second;
+        pending_datagrams.push(dgram);
+        if (inserted || debounce == 0) {
+            auto arp = ARPMessage{};
+            arp.opcode = ARPMessage::OPCODE_REQUEST;
+            arp.sender_ethernet_address = _ethernet_address;
+            arp.sender_ip_address = _ip_address.ipv4_numeric();
+            arp.target_ip_address = next_hop_ip;
+
+            auto frame = EthernetFrame();
+            frame.header().dst = ETHERNET_BROADCAST;
+            frame.header().src = _ethernet_address;
+            frame.header().type = EthernetHeader::TYPE_ARP;
+            frame.payload() = arp.serialize();
+            _frames_out.push(std::move(frame));
+        }
+        return;
+    }
+    // Construct an Ethernet frame with the IP datagram and send it to the resolved Ethernet address
+    const auto &[eth_addr, expiration_time] = it->second;
+    auto frame = EthernetFrame();
+    frame.header().dst = eth_addr;
+    frame.header().src = _ethernet_address;
+    frame.header().type = EthernetHeader::TYPE_IPv4;
+    frame.payload() = dgram.serialize();
+    _frames_out.push(std::move(frame));
 }
 
 //! \param[in] frame the incoming Ethernet frame
@@ -45,11 +75,11 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick(const size_t ms_since_last_tick) {
     for (auto &[ip, val] : _address_resolution_queue) {
-        auto &[debounce, queue] = val;
+        auto &[debounce, pending_datagrams] = val;
         debounce -= min(ms_since_last_tick, debounce);
     }
     for (auto &[ip, val] : _ethernet_address_lookup) {
         auto &[eth_addr, expiration_time] = val;
         expiration_time -= min(ms_since_last_tick, expiration_time);
-    } 
+    }
 }
