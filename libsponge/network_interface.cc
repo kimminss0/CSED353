@@ -18,6 +18,21 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 
 using namespace std;
 
+void NetworkInterface::_send_arp_request(uint32_t target_ip_address) {
+    auto arp = ARPMessage{};
+    arp.opcode = ARPMessage::OPCODE_REQUEST;
+    arp.sender_ethernet_address = _ethernet_address;
+    arp.sender_ip_address = _ip_address.ipv4_numeric();
+    arp.target_ip_address = target_ip_address;
+
+    auto frame = EthernetFrame();
+    frame.header().dst = ETHERNET_BROADCAST;
+    frame.header().src = _ethernet_address;
+    frame.header().type = EthernetHeader::TYPE_ARP;
+    frame.payload() = arp.serialize();
+    _frames_out.push(std::move(frame));
+}
+
 //! \param[in] ethernet_address Ethernet (what ARP calls "hardware") address of the interface
 //! \param[in] ip_address IP (what ARP calls "protocol") address of the interface
 NetworkInterface::NetworkInterface(const EthernetAddress &ethernet_address, const Address &ip_address)
@@ -40,20 +55,8 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
             next_hop_ip, std::make_pair(ARP_DEBOUNCE_TIME, std::queue<InternetDatagram>()));
         auto &[debounce, pending_datagrams] = it1->second;
         pending_datagrams.push(dgram);
-        if (inserted || debounce == 0) {
-            auto arp = ARPMessage{};
-            arp.opcode = ARPMessage::OPCODE_REQUEST;
-            arp.sender_ethernet_address = _ethernet_address;
-            arp.sender_ip_address = _ip_address.ipv4_numeric();
-            arp.target_ip_address = next_hop_ip;
-
-            auto frame = EthernetFrame();
-            frame.header().dst = ETHERNET_BROADCAST;
-            frame.header().src = _ethernet_address;
-            frame.header().type = EthernetHeader::TYPE_ARP;
-            frame.payload() = arp.serialize();
-            _frames_out.push(std::move(frame));
-        }
+        if (inserted || debounce == 0)
+            _send_arp_request(next_hop_ip);
         return;
     }
     // Construct an Ethernet frame with the IP datagram and send it to the resolved Ethernet address
