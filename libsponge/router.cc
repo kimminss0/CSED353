@@ -4,17 +4,6 @@
 
 using namespace std;
 
-// Dummy implementation of an IP router
-
-// Given an incoming Internet datagram, the router decides
-// (1) which interface to send it out on, and
-// (2) what next hop address to send it to.
-
-// For Lab 6, please replace with a real implementation that passes the
-// automated checks run by `make check_lab6`.
-
-// You will need to add private members to the class declaration in `router.hh`
-
 template <typename... Targs>
 void DUMMY_CODE(Targs &&... /* unused */) {}
 
@@ -28,15 +17,41 @@ void Router::add_route(const uint32_t route_prefix,
                        const size_t interface_num) {
     cerr << "DEBUG: adding route " << Address::from_ipv4_numeric(route_prefix).ip() << "/" << int(prefix_length)
          << " => " << (next_hop.has_value() ? next_hop->ip() : "(direct)") << " on interface " << interface_num << "\n";
-
-    DUMMY_CODE(route_prefix, prefix_length, next_hop, interface_num);
-    // Your code here.
+    _fib.emplace_back(route_prefix, prefix_length, next_hop, interface_num);
 }
 
 //! \param[in] dgram The datagram to be routed
 void Router::route_one_datagram(InternetDatagram &dgram) {
-    DUMMY_CODE(dgram);
-    // Your code here.
+    const auto destination = dgram.header().dst;
+
+    if (dgram.header().ttl <= 1)
+        return;
+    dgram.header().ttl--;
+
+    bool matched = false;
+    uint8_t match_len{0};
+    optional<Address> next_hop{};
+    size_t interface_num;
+
+    for (const auto &v : _fib) {
+        uint32_t route_prefix;
+        uint8_t prefix_len;
+        tie(route_prefix, prefix_len, std::ignore, std::ignore) = v;
+
+        if (matched && prefix_len <= match_len)
+            continue;
+
+        const uint32_t netmask = prefix_len > 0 ? (0xffffffff) << (32 - prefix_len) : 0;
+        if ((destination & netmask) != route_prefix)
+            continue;
+
+        matched = true;
+        tie(std::ignore, match_len, next_hop, interface_num) = v;
+    }
+    if (!matched)
+        return;
+
+    interface(interface_num).send_datagram(dgram, next_hop.value_or(Address::from_ipv4_numeric(destination)));
 }
 
 void Router::route() {
